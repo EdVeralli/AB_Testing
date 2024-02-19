@@ -24,7 +24,7 @@ current_directory = os.getcwd()
 print("Directorio actual de trabajo:", current_directory)
 
 # Cambia el directorio de trabajo
-new_directory = '/home/eduardo/GCBA/AB_Testing/data'
+new_directory = 'C:\GCBA\AB_Testing\data'
 os.chdir(new_directory)
 
 # Verifica que el cambio se haya realizado
@@ -39,7 +39,7 @@ rule_ne='PLBWX5XYGQ2B3GP7IN8Q-nml045fna3@b.m-1669990832420'
 
 
 
-mm=pd.read_csv('mm-01-29.csv')
+mm=pd.read_csv('mm-02-07.csv')
 
 """
 Hora y dia del deploy one shot:
@@ -118,7 +118,7 @@ mm1.usuario.nunique()
 # 6. Filtra las filas donde la condición 'RuleBuilder:'+mostrado es igual a 'response_intent_id' y elimina duplicados basándose en 'id'.
 # 7. Crea una nueva columna 'fecha' que contiene solo la parte de la fecha de la columna 'ts'.
 
-search=pd.read_csv('clicks-01-29.csv')
+search=pd.read_csv('clicks-02-07.csv')
 search.drop_duplicates(['session_id', 'ts', 'id', 'message', 'mostrado', 'response_message'], inplace=True)
 search.ts=pd.to_datetime(search.ts)
 search['usuario']=search.session_id.str[:20]
@@ -134,7 +134,7 @@ search.head()
 
 
 #buttons
-one=pd.read_csv('buttons-01-29.csv')
+one=pd.read_csv('buttons-02-07.csv')
 
 
 
