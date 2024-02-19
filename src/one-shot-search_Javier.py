@@ -1,7 +1,5 @@
-
 import pandas as pd
 import numpy as np
-import sys
 from datetime import datetime, timezone, timedelta
 from matplotlib import pyplot as plt 
 import math
@@ -9,36 +7,32 @@ import scipy
 import pickle as pkl
 import re
 import datetime
+import sys
+import os
+import time
 pd.set_option("display.max_colwidth", None)
 import warnings
 warnings.filterwarnings('ignore')
-
-
-
-
-# usuarios que mandaron @test_on @test_off @reset_user
-# Obtén el directorio actual de trabajo
-import os
-current_directory = os.getcwd()
-
-#print("Directorio actual de trabajo:", current_directory)
-
-# Cambia el directorio de trabajo
+inicio_proceso = time.time()
 new_directory = '..\data'
 os.chdir(new_directory)
-
-# Verifica que el cambio se haya realizado
 current_directory = os.getcwd()
-print("Nuevo directorio de trabajo:", current_directory)
+print("Directorio que contiene los archivos CSV de Input: ", current_directory)
+
+"""
+fecha_inicio indica desde cuando hay que filtrar los datos. debe coincidir con el rango fecha de los SQL
+"""
+fecha_inicio = '2024-01-01 12:30:00'
+
+# usuarios que mandaron @test_on @test_off @reset_user
 testers=pd.read_csv('testers.csv')
 #testers=testers.f0_.values
 
 
-
 rule_ne='PLBWX5XYGQ2B3GP7IN8Q-nml045fna3@b.m-1669990832420'
 
-
-mm=pd.read_csv('mm-02-07.csv')
+print("Lee CSV de Mensajes")
+mm=pd.read_csv('at-MENSAJES.csv')
 
 """
 Hora y dia del deploy one shot:
@@ -48,30 +42,33 @@ Cambio de constante al 20%:
 
 Cambio al 40%:
 16/01 - 9:30 a.m.
-"""
 
+Cambio al 100%
+25/01 - 14:46
+"""
 
 mm.creation_time=pd.to_datetime(mm.creation_time)
 
+#mm.creation_time = pd.to_datetime(str(mm.creation_time)[10:30])
 
+mm.creation_time=mm.creation_time.dt.tz_localize(None)
+#mm = mm.rename(columns = {"vars_value": "value"})
 
-mm1=mm[np.logical_or(mm.vars_value<21, np.logical_and(mm.vars_value<41, mm.creation_time>=np.datetime64('2024-01-10 14:52:00')))]
+#mm1=mm[np.logical_or(mm.vars_value<21, np.logical_and(mm.vars_value<41, mm.creation_time>=np.datetime64('2024-01-10 14:52:00')))]
 
+#mm1=mm[np.logical_or(mm.vars_value<0, np.logical_and(mm.vars_value<0, mm.creation_time>=np.datetime64('2024-01-25 14:46:00')))]
 
+mm1=mm[mm['creation_time']>=np.datetime64(fecha_inicio)]
 
-
-mm2=mm[~np.logical_or(mm.vars_value<21, np.logical_and(mm.vars_value<41, mm.creation_time>=np.datetime64('2024-01-10 14:52:00')))]
-
+#mm2=mm[~np.logical_or(mm.vars_value<21, np.logical_and(mm.vars_value<41, mm.creation_time>=np.datetime64('2024-01-10 14:52:00')))]
+mm2=mm[mm['creation_time']>=np.datetime64(fecha_inicio)]
 
 
 
 mm1.rule_name.nunique()
 
 
-
 mm2.rule_name.nunique()
-
-
 
 
 # Preprocesamiento de DataFrames mm1 y mm2:
@@ -82,6 +79,7 @@ mm2.rule_name.nunique()
 # 5. Reinicia los índices para ambos DataFrames.
 
 print("Preprocesamiento de DataFrames mm1 y mm2")
+
 mm1.creation_time=pd.to_datetime(mm1.creation_time)
 mm1.creation_time=mm1.creation_time.dt.ceil('s')
 mm1.drop_duplicates(['session_id', 'creation_time', 'msg_from', 'rule_name'], inplace=True)
@@ -94,8 +92,6 @@ mm1=mm1[~mm1.usuario.isin(testers)]
 mm2=mm2[~mm2.usuario.isin(testers)]
 mm1.reset_index(inplace=True, drop=True)
 mm2.reset_index(inplace=True, drop=True)
-
-
 
 mm2.usuario.nunique()
 
@@ -117,7 +113,9 @@ mm1.usuario.nunique()
 # 7. Crea una nueva columna 'fecha' que contiene solo la parte de la fecha de la columna 'ts'.
 
 print("Procesamiento de datos del archivo CLICKS.csv")
-search=pd.read_csv('clicks-02-07.csv')
+print("Lee CSV de CLICKS")
+
+search=pd.read_csv('at-CLICKS.csv')
 search.drop_duplicates(['session_id', 'ts', 'id', 'message', 'mostrado', 'response_message'], inplace=True)
 search.ts=pd.to_datetime(search.ts)
 search['usuario']=search.session_id.str[:20]
@@ -127,24 +125,24 @@ searchcl=search['RuleBuilder:'+search.mostrado==search.response_intent_id].drop_
 search['fecha']=search.ts.dt.date
 
 
-
 search.head()
 
 
+searchcl.head()
 
+
+print("Lee CSV de BOTONES")
 #buttons
-one=pd.read_csv('buttons-02-07.csv')
+one=pd.read_csv('at-BOTONES.csv')
 
 
-
+print("Procesamiento de datos en el DataFrame 'one':  ONESHOTS")
 # Procesamiento de datos en el DataFrame 'one':  ONESHOTS
 # 1. Crea una nueva columna 'usuario' extrayendo los primeros 20 caracteres de 'session_id'.
 # 2. Filtra las filas en 'one' donde el 'usuario' no está en la lista de 'testers'.
 # 3. Genera un subconjunto os con las filas en 'one' donde la condición 'one_shot' es verdadera y el tipo es 'oneShot' o 'oneShotSearch'.
 # 4. Convierte la columna 'ts' del subconjunto 'os' a formato de fecha y hora.
 # 5. Crea una nueva columna 'fecha' en el subconjunto 'os' que contiene solo la parte de la fecha de la columna 'ts'.
-
-print("Procesamiento de datos en el DataFrame 'one':  ONESHOTS")
 
 one['usuario']=one.session_id.str[:20]
 one=one[~one.usuario.isin(testers)]
@@ -153,19 +151,16 @@ os.ts=pd.to_datetime(os.ts)
 os['fecha']=os.ts.dt.date
 
 
-
-
 mos=pd.read_csv('Actualizacion_Lista_Blanca.csv')
 rules_mos=mos['Nombre de la intención'].str.strip().values
 
 
+print("transformacioneS")
 # ### transformaciones
 
 
-print("transformaciones")
 # sacamos mensajes seguidos de boti
 # Proceso de limpieza en el DataFrame 'mm1':
-print("Proceso de limpieza en el DataFrame 'mm1")
 # 1. Reinicia los índices del DataFrame 'mm1'.
 # 2. Identifica y crea una lista 'drop' con índices a eliminar donde 'msg_from' y 'session_id' son iguales en filas consecutivas.
 # 3. Elimina las filas identificadas en la lista 'drop' del DataFrame 'mm1'.
@@ -181,7 +176,7 @@ mm1.reset_index(inplace=True, drop=True)
 
 
 
-mm1.head()
+mm1[~mm1['max_score'].isnull()].head()
 
 
 
@@ -191,7 +186,7 @@ mm1.head()
 # 2. Identifica y crea una lista 'drop' con índices a eliminar donde 'msg_from' y 'session_id' son iguales en filas consecutivas.
 # 3. Elimina las filas identificadas en la lista 'drop' del DataFrame 'mm2'.
 # 4. Reinicia los índices del DataFrame 'mm2' después de la eliminación.
-print("Proceso de limpieza en el DataFrame 'mm2")
+
 mm2.reset_index(inplace=True, drop=True)
 drop=[i if mm2.loc[i].msg_from==mm2.loc[i+1].msg_from and mm2.loc[i].session_id==mm2.loc[i+1].session_id else None for i in mm2.index[:-1]]
 drop=list(set(drop))
@@ -203,7 +198,8 @@ mm2.reset_index(inplace=True, drop=True)
 
 # ### modelo nuevo, primera instancia
 
-print("modelo nuevo, primera instancia")
+
+
 # Análisis de respuestas por usuario en el DataFrame 'mm1':
 # 1. Filtra y estructura datos relevantes en el DataFrame 'mmtex1'.
 # 2. Realiza operaciones en DataFrames adicionales ('letra1', 'search1', 'os1', 'primera_instancia1', etc.).
@@ -211,7 +207,7 @@ print("modelo nuevo, primera instancia")
 # 4. Calcula porcentajes de respuestas por categoría para cada usuario en 'respuestas_por_usuario'.
 # 5. Calcula promedios de porcentajes para distintas categorías en 'promedios1'.
 # 6. Almacena resultados finales en 'res_primera_instancia1'.
-
+print("modelo nuevo, primera instancia")
 
 mm=mm1.copy()
 mm.reset_index(inplace=True, drop=True)
@@ -264,7 +260,6 @@ promedios1={'abandonos': round(respuestas_por_usuario['porcentaje_abandono'].mea
            'ne': round(respuestas_por_usuario['porcentaje_ne'].mean(), 3)}
 
 
-
 # Análisis de respuestas por usuario en el DataFrame 'mm2':
 # 1. Filtra y estructura datos relevantes en el DataFrame 'mmtex2'.
 # 2. Realiza operaciones en DataFrames adicionales ('letra2', 'search2', 'os2', 'primera_instancia2', etc.).
@@ -272,7 +267,6 @@ promedios1={'abandonos': round(respuestas_por_usuario['porcentaje_abandono'].mea
 # 4. Calcula porcentajes de respuestas por categoría para cada usuario en 'respuestas_por_usuario'.
 # 5. Calcula promedios de porcentajes para distintas categorías en 'promedios2'.
 # 6. Almacena resultados finales en 'res_primera_instancia2'.
-print("Análisis de respuestas por usuario en el DataFrame 'mm2'")
 
 mm=mm2.copy()
 mm.reset_index(inplace=True, drop=True)
@@ -324,17 +318,12 @@ promedios2={'abandonos': round(respuestas_por_usuario['porcentaje_abandono'].mea
             'letra': round(respuestas_por_usuario['porcentaje_letra'].mean(), 3),
            'ne': round(respuestas_por_usuario['porcentaje_ne'].mean(), 3)}
 
-print("imprimo Promedios1 y Promedios2")
 
-print("Promedios1",promedios1) #20%
-
-
-
-print("Promedios2",promedios2) #80%
-
+print("promedios 1",promedios1) #40%
+print("promedios 2",promedios2) #60%
 
 """
-promedios1 80%
+promedios1 60%
 {'abandonos': 0.062,
  'click': 0.44,
  'one': 0.229,
@@ -343,7 +332,7 @@ promedios1 80%
  'letra': 0.076,
  'ne': 0.015}
 
-promedios2 20%
+promedios2 40%
 {'abandonos': 0.001,
  'click': 0.029,
  'one': 0.757,
@@ -351,8 +340,8 @@ promedios2 20%
  'nada': 0.003,
  'letra': 0.2,
  'ne': 0.002}
-
 """
+
 
 def categoria(m, t, r):
     #mensaje, tipo de mensaje, rulename
@@ -382,6 +371,7 @@ def categoria(m, t, r):
 
 
 
+print("Análisis de interacciones del usuario en el DataFrame 'mm1':")
 # Análisis de interacciones del usuario en el DataFrame 'mm1':
 # 1. Filtra y estructura datos relevantes para conversaciones con botones ('conv_cl').
 # 2. Crea un DataFrame 'conv' para conversaciones de un solo disparo.
@@ -389,8 +379,6 @@ def categoria(m, t, r):
 # 4. Combina datos de 'conv_cl' y 'conv' en 'usuario1'.
 # 5. Calcula categorías y usuarios en 'usuario1'.
 # 6. Almacena resultados finales en 'usuario1'.
-
-print("Análisis de interacciones del usuario en el DataFrame 'mm1'")
 
 mm=mm1.copy()
 mm.reset_index(inplace=True, drop=True)
@@ -431,6 +419,7 @@ usuario1['usuario']=usuario1.session_id.str[:20]
 usuario1['id']=usuario1.bot1_id
 
 
+print("Análisis de interacciones del usuario en el DataFrame 'mm2':")
 # Análisis de interacciones del usuario en el DataFrame 'mm2':
 # 1. Filtra y estructura datos relevantes para conversaciones con botones ('conv_cl').
 # 2. Crea un DataFrame 'conv' para conversaciones de un solo disparo.
@@ -438,8 +427,6 @@ usuario1['id']=usuario1.bot1_id
 # 4. Combina datos de 'conv_cl' y 'conv' en 'usuario2'.
 # 5. Calcula categorías y usuarios en 'usuario2'.
 # 6. Almacena resultados finales en 'usuario2'.
-
-print("Análisis de interacciones del usuario en el DataFrame 'mm2'")
 
 mm=mm2.copy()
 mm.reset_index(inplace=True, drop=True)
@@ -480,13 +467,12 @@ usuario2['usuario']=usuario2.session_id.str[:20]
 usuario2['id']=usuario2.bot1_id
 
 """
-20%: usuario1
-80%: usuario2
+40%: usuario1
+60%: usuario2
 """
 # ### resultados
 
-
-print("Análisis de resultados por usuario")
+print("Análisis de resultados por usuario:")
 # Análisis de resultados por usuario:
 # - Para cada usuario (usuario1 y usuario2):
 #   1. Calcula la frecuencia de respuestas por categoría ('abandono', 'boton', 'otros', 'texto', 'x', 'cambiar').
@@ -517,37 +503,33 @@ for usuario in [usuario1, usuario2]:
 pd.DataFrame(promedios, index=['nuevo-con-oss', 'nuevo-sin-oss'])[['abandonos', 'botones', 'texto', 'x', 'cambiar de tema', 'otros']]
 
 
-
 sin_oss1={k:v*100 for k,v in promedios2.items()} 
 sin_oss2={k: (promedios2['click']+promedios2['one'])*v*100 for k, v in promedios[1].items()}
 con_oss1={k:v*100 for k,v in promedios1.items()} 
 con_oss2={k: (promedios1['click']+promedios1['one'])*v*100 for k, v in promedios[0].items()}
 
-
-sin_oss1
-
-
-con_oss1
-
-
-
-sin_oss2
-
-
-
-
-con_oss2
-
-
+print("=============================================================================================")
+print("=============================================================================================")
+print("=============================================================================================")
+print("=============================================================================================")
+print("sin_oss1",sin_oss1)
+print("----------------------------------------------------------------------------------------------")
+print("con_oss1",con_oss1)
+print("----------------------------------------------------------------------------------------------")
+print("sin_oss2",sin_oss2)
+print("----------------------------------------------------------------------------------------------")
+print("con_oss2",con_oss2)
+print("=============================================================================================")
+print("=============================================================================================")
+print("=============================================================================================")
+print("=============================================================================================")
 
 (len(res_primera_instancia1.usuario.unique()), len(res_primera_instancia2.usuario.unique()))
 
 
 # ### diferencias
 
-
-
-
+print("diferencias")
 def difz(p1, p2, n1, n2):
     # test estadístico, alfa=0,05
     z=(p1-p2)/math.sqrt(p1*(1-p1)/n1+p2*(1-p2)/n2)
@@ -556,7 +538,7 @@ def difz(p1, p2, n1, n2):
     else:
         return z
 
-print("Comparación de porcentajes normalizados entre dos conjuntos de datos ('sin_oss' y 'con_oss')")
+print("Comparación de porcentajes normalizados entre dos conjuntos de datos ('sin_oss' y 'con_oss'):")
 # Comparación de porcentajes normalizados entre dos conjuntos de datos ('sin_oss' y 'con_oss'):
 # - Para diferentes categorías de respuestas:
 #   1. Calcula porcentajes de respuestas para cada categoría.
@@ -610,10 +592,9 @@ except:
     pass
 
 
-print("metricas generales")
 # ### metricas generales
 
-
+print("metricas generales")
 """
 Este código realiza análisis y cálculos estadísticos sobre un conjunto de datos representado por el DataFrame `df1`.
 Realiza las siguientes acciones:
@@ -632,7 +613,7 @@ Realiza las siguientes acciones:
 Nota: Algunas líneas de código están comentadas (`#`) debido a la falta de información sobre ciertas variables (por ejemplo, `save_path`).
 """
 
-df1 = mm2.copy()
+df1 = mm1.copy()
 df1 = df1.rename(columns = {"max_score": "score"})
 # Elimina las lineas donde comienza y termina una interaccion con un operador
 
@@ -691,15 +672,85 @@ df = pd.DataFrame(index = data1.keys(), data= {'df1':data1.values()})
 df
 
 
+df2 = mm2.copy()
+df2 = df2.rename(columns = {"max_score": "score"})
+# Elimina las lineas donde comienza y termina una interaccion con un operador
+
+op1 = df2.loc[df2.msg_from == 'operator'][['session_id','msg_from','creation_time']]
+
+max_sid1 = op1.groupby('session_id').creation_time.max()
+
+min_sid1 = op1.groupby('session_id').creation_time.min()
+
+sid1 = []
+for a in min_sid1.keys():
+    for b in range(op1[np.logical_and(op1['session_id'] == a,op1['creation_time'] == min_sid1[a])].index[0],
+                   op1[np.logical_and(op1['session_id'] == a,op1['creation_time'] == max_sid1[a])].index[0]+1):
+        sid1.append(b)
+        
+df2 = df2.drop(sid1)
+
+# Comienza a guardar metricas
+inter1 = df2[df2.msg_from == 'user'].groupby(['session_id']).msg_from.count().sort_values(ascending = False)
+data1 = {'cant_sesiones':len(inter1),
+         'cant_interacciones':inter1.sum(), 
+         'interacciones_promedio':inter1.mean(), 
+         'interacciones_mediana':inter1.median(), 
+         'interacciones_primer_cuartil':inter1.quantile(0.25), 
+         'interacciones_tercer_cuartil':inter1.quantile(0.75),
+         'interacciones_p95':inter1.quantile(0.95)
+        }
+
+ne1 = len(df2[df2.score < 5.36])/len(df2[np.logical_and(df2.msg_from == 'user', df2.message_type == 'Text')])*100
+
+data1['no_entendidos_pc'] = ne1
+
+#Cantidad de intenciones repetidas llegando por texto
+dfint1 = df2.dropna(subset=['original_user_message']).reset_index(drop = True)
+dfint1.creation_time = dfint1.loc[dfint1.msg_from.isin(['bot','user']),'creation_time'] 
+int_texto1 = dfint1[~dfint1.original_user_message.str.contains('{')].drop_duplicates(['session_id','creation_time']).groupby(['session_id','rule_name'])[['rule_name']].count().rename(columns = {'rule_name':'cantidad'})
+int_texto1 = int_texto1.reset_index()
+data1['intents_repetidos_texto_promedio'] = int_texto1.cantidad.mean()
+data1['intents_repetidos_texto_mediana'] = int_texto1.cantidad.median()
+
+#Cantidad de mensajes repetidos del usuario por sesión
+df2.loc[np.logical_and(df2['msg_from'] == 'user', df2['message_type'] == 'Text'),'message'] = df2.loc[np.logical_and(df2['msg_from'] == 'user', df2['message_type'] == 'Text'),'message'].str.lower()
+messrep1 = (df2[np.logical_and(df2['msg_from'] == 'user', df2['message_type'].isin(['Text']))].groupby(['session_id','message']).message_type.count().sort_values(ascending = False)).reset_index().rename(columns = {'message_type':'count'})
+data1['mensajes_repetidos_promedio'] = messrep1[messrep1['count'] > 1]['count'].mean()
+data1['mensajes_repetidos_mediana'] = messrep1[messrep1['count'] > 1]['count'].median()
+
+#Maximo mensje repetido de cada usuario en una sesion
+usrmsgrep1 = messrep1.sort_values(by = ['session_id','count'], ascending = False).drop_duplicates('session_id', keep = 'first').sort_values('count', ascending = False)
+
+data1['mensajes_repetidos_maximo_por_usuaruio_promedio'] = usrmsgrep1[usrmsgrep1['count'] > 1]['count'].mean()
+data1['mensajes_repetidos_maximo_por_usuaruio_mediana'] = usrmsgrep1[usrmsgrep1['count'] > 1]['count'].mean()
+
+#resultados
+df = pd.DataFrame(index = data1.keys(), data= {'df2':data1.values()})
+#df.to_csv(f'{save_path}/indicadores_generales_{datetime.now()}.csv')
 df
 
+# Obtener la hora de fin
+fin_proceso = time.time()
 
+# Calcular el tiempo transcurrido
+tiempo_transcurrido = fin_proceso - inicio_proceso
 
+# Imprimir los resultados
+print("Hora de inicio:", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(inicio_proceso)))
+print("Hora de fin:", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(fin_proceso)))
+print("Tiempo transcurrido:", tiempo_transcurrido, "segundos")
 
-print("final")
+"""
+De aca en adelante IGNORAR
+"""
+
 sys.exit()
 
+
 # ### dfs por categoría   RECONSTRUIR PARA LOS DF ACTUALES
+
+# In[45]:
 
 
 """

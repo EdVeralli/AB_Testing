@@ -6,6 +6,7 @@ import math
 import scipy
 import pickle as pkl
 import re
+import sys
 import datetime
 pd.set_option("display.max_colwidth", None)
 import warnings
@@ -13,10 +14,10 @@ warnings.filterwarnings('ignore')
 import os
 current_directory = os.getcwd()
 
-print("Directorio actual de trabajo:", current_directory)
+#print("Directorio actual de trabajo:", current_directory)
 
 # Cambia el directorio de trabajo
-new_directory = 'C:\GCBA\AB_Testing\data'
+new_directory = '..\data'
 os.chdir(new_directory)
 current_directory = os.getcwd()
 print("Nuevo directorio de trabajo:", current_directory)
